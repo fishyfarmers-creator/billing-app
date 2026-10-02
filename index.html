@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fishy Farmers Billing App</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f7f6;
+        margin: 0;
+        padding: 20px;
+        text-align: center;
+      }
+      .card {
+        background: white;
+        padding: 24px;
+        border-radius: 16px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        max-width: 420px;
+        margin: 0 auto;
+      }
+      h2 { color: #004d40; margin-bottom: 20px; }
+      .btn {
+        width: 100%;
+        padding: 14px;
+        margin: 8px 0;
+        border: none;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+      }
+      .btn-quote { background-color: #2e7d32; color: white; }
+      .btn-invoice { background-color: #1565c0; color: white; }
+      .btn-record { background-color: #e65100; color: white; margin-top: 10px; }
+      .btn-record.recording { background-color: #c62828; animation: pulse 1.5s infinite; }
+      .btn-submit { background-color: #00838f; color: white; margin-top: 10px; }
+      
+      @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.6; }
+        100% { opacity: 1; }
+      }
+
+      textarea {
+        width: 90%;
+        height: 100px;
+        margin-top: 12px;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        font-size: 15px;
+      }
+      #status { margin-top: 15px; font-weight: bold; color: #333; white-space: pre-wrap; text-align: left; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h2>🐟 Fishy Farmers App</h2>
+      <p>Select document type and record your order:</p>
+      
+      <button class="btn btn-quote" onclick="selectDoc('QUOTATION')">🟢 Create Quotation</button>
+      <button class="btn btn-invoice" onclick="selectDoc('INVOICE')">🔵 Create Tax Invoice</button>
+
+      <div id="actionArea" style="display:none;">
+        <h4 id="selectedDocLabel"></h4>
+        
+        <button id="micBtn" class="btn btn-record" onclick="toggleSpeech()">🎙️ Tap to Speak</button>
+        
+        <textarea id="voiceText" placeholder="Spoken transcript will appear here..."></textarea>
+        
+        <button class="btn btn-submit" onclick="submitOrder()">🚀 Process Order</button>
+      </div>
+
+      <div id="status"></div>
+    </div>
+
+    <script>
+      const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyMQiQoiWtRyJQxsYx89_zI63mNOAFVTL2K7ucN2vLGXcYHikmge3pNmJ9YR3RKvrP5/exec";
+      let currentDocType = '';
+      let recognition;
+      let isRecording = false;
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-IN';
+
+        recognition.onresult = (event) => {
+          let transcript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+          }
+          document.getElementById('voiceText').value = transcript;
+        };
+
+        recognition.onerror = (event) => {
+          document.getElementById('status').innerText = '⚠️ Speech Recognition Error: ' + event.error;
+          stopRecording();
+        };
+
+        recognition.onend = () => {
+          if (isRecording) stopRecording();
+        };
+      }
+
+      function selectDoc(docType) {
+        currentDocType = docType;
+        document.getElementById('actionArea').style.display = 'block';
+        document.getElementById('selectedDocLabel').innerText = 'Selected: ' + docType;
+        document.getElementById('status').innerText = '';
+      }
+
+      function toggleSpeech() {
+        if (!recognition) {
+          alert('Speech Recognition is not supported on this browser. Use Chrome.');
+          return;
+        }
+        if (isRecording) {
+          stopRecording();
+        } else {
+          startRecording();
+        }
+      }
+
+      function startRecording() {
+        isRecording = true;
+        const btn = document.getElementById('micBtn');
+        btn.innerText = '🛑 Stop Recording...';
+        btn.classList.add('recording');
+        document.getElementById('status').innerText = '🎙️ Listening... Speak your order.';
+        recognition.start();
+      }
+
+      function stopRecording() {
+        isRecording = false;
+        const btn = document.getElementById('micBtn');
+        btn.innerText = '🎙️ Tap to Speak';
+        btn.classList.remove('recording');
+        recognition.stop();
+      }
+
+      function submitOrder() {
+        if (isRecording) stopRecording();
+
+        const text = document.getElementById('voiceText').value;
+        if (!text) {
+          alert('Please speak or type some text first!');
+          return;
+        }
+        document.getElementById('status').innerText = '⏳ Processing order with Gemini AI...';
+
+        fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userText: text, docType: currentDocType })
+        })
+        .then(() => {
+          document.getElementById('status').innerText = '✅ Order submitted successfully to Fishy Farmers system!';
+        })
+        .catch(err => {
+          document.getElementById('status').innerText = '❌ Error sending request: ' + err.message;
+        });
+      }
+    </script>
+  </body>
+</html>
